@@ -1,0 +1,82 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch: # Manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Print current working directory
+        run: pwd
+
+        # Set up AWS credentials using GitHub Secrets
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1 # You can replace this with your desired region
+
+      # Print the AWS account ID to verify connection
+      - name: Verify AWS Connection (Print AWS Account ID)
+        run: |
+          aws sts get-caller-identity
+        env:
+          AWS_DEFAULT_REGION: us-east-1 # Replace with your region if different
+          ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
+
+      - name: Get GitHub OIDC Token
+        id: oidc
+        run: |
+          TOKEN=$(curl -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" "$ACTIONS_ID_TOKEN_REQUEST_URL" | jq -r '.value')
+          echo "OIDC Token: $TOKEN"
+
+      - name: Set up Node.js environment
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install dependencies
+        run: |
+          cd CDK
+          npm ci
+
+      - name: Clean CDK Context
+        run: |
+          cd CDK
+          rm -rf node_modules/.cdk
+
+      - name: Synthesize CDK Stack
+        run: |
+          cd CDK
+          npx cdk synth || echo "Synthesis failed"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/GitHubActionsAdminRole
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      # Step to Bootstrap the CDK environment
+      - name: Bootstrap CDK Environment
+        run: |
+          cd CDK
+          echo bootstrapping aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ secrets.AWS_REGION }}
+          npx cdk bootstrap aws://${{ secrets.AWS_ACCOUNT_ID }}/${{ secrets.AWS_REGION }}
+
+        # Deploy the ECR stack first to create the ECR repository
+      - name: Deploy EC2 Stack
+        run: |
+          cd CDK
+          npx cdk deploy EC2Stack --require-approval never

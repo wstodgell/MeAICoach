@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@aws-cdk/aws-ec2": "^1.203.0"
+  }
+}
