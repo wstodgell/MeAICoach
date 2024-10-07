@@ -33,10 +33,45 @@ export class EC2Stack extends cdk.Stack {
           },
         },
         // Remove tags by ensuring no tagSpecifications are passed
-        tagSpecifications: [],
+      tagSpecifications: [],
       },
     });
 
+    const configureCloudWatchLambda = new lambda.Function(this, 'ConfigureCloudWatchLambda', {
+      runtime: lambda.Runtime.PYTHON_3_8,
+      handler: 'configure_alarm.lambda_handler',
+      code: lambda.Code.fromInline(`
+        import boto3
+        import os
+    
+        def lambda_handler(event, context):
+            ec2_client = boto3.client('ec2')
+            cloudwatch_client = boto3.client('cloudwatch')
+    
+            instance_id = os.environ['INSTANCE_ID']
+    
+            # Create the CloudWatch alarm
+            cloudwatch_client.put_metric_alarm(
+                AlarmName='LowCpuAlarm',
+                MetricName='CPUUtilization',
+                Namespace='AWS/EC2',
+                Statistic='Average',
+                Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
+                Period=300,  # 5 minutes
+                EvaluationPeriods=6,
+                Threshold=5,
+                ComparisonOperator='LessThanThreshold',
+                AlarmActions=[]  # Can add an action here if needed
+            )
+    
+            return {'statusCode': 200, 'body': 'Alarm created'}
+      `),
+      environment: {
+        INSTANCE_ID: 'placeholder',  // Update with the actual InstanceId when known
+      },
+    });
+
+    /*
     // Create the EC2 Spot Instance using the launch template
     const instance = new ec2.CfnInstance(this, 'SpotInstance', {
       launchTemplate: {
@@ -61,6 +96,7 @@ export class EC2Stack extends cdk.Stack {
       evaluationPeriods: 6, // 6 periods of 5 minutes = 30 minutes
       datapointsToAlarm: 6
     });
+    
 
     // Create a Lambda function to stop the EC2 instance
     const stopInstanceLambda = new lambda.Function(this, 'StopInstanceLambda', {
@@ -82,6 +118,6 @@ export class EC2Stack extends cdk.Stack {
 
     // Trigger Lambda from CloudWatch Alarm
     alarm.addAlarmAction(new cloudwatch_actions.LambdaAction(stopInstanceLambda));
-
+    */
   }
 }
