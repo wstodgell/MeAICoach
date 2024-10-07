@@ -4,32 +4,54 @@ import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cloudwatch_actions from 'aws-cdk-lib/aws-cloudwatch-actions';
+import * as events from 'aws-cdk-lib/aws-events';  // Import AWS EventBridge
+import * as targets from 'aws-cdk-lib/aws-events-targets';  // Import Lambda targets for EventBridge
 import { Construct } from 'constructs';
 
 export class EC2Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Create a VPC
-    const vpc = new ec2.Vpc(this, 'MyVPC', {
+    // Create a VPC to host the EC2 instance - it spreads across two availability zones.
+
+    const vpc = new ec2.Vpc(this, 'AIModelVPC', {
       maxAzs: 2
     });
+
+    // Step 2: Create a security group in your VPC
+    const securityGroup = new ec2.SecurityGroup(this, 'AIModelSG', {
+      vpc,
+      allowAllOutbound: true, // Allows all outbound traffic by default
+      securityGroupName: 'AIModelSecurityGroup',
+    });
+
+    // Allow inbound SSH access (port 22) from any IP (can restrict this for better security)
+    securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'Allow SSH access');
+
+    // (Optional) Allow inbound HTTP access (port 80)
+    securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'Allow HTTP access');
 
     // Create a Launch Template for Spot Instance
     const launchTemplate = new ec2.CfnLaunchTemplate(this, 'LaunchTemplate', {
       launchTemplateData: {
         instanceType: 'g4dn.xlarge',
         imageId: new ec2.AmazonLinuxImage().getImage(this).imageId,
+        userData: cdk.Fn.base64(`
+          #!/bin/bash
+          sudo yum update -y
+          # Install PyTorch with GPU support
+          pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+        `),
         blockDeviceMappings: [
           {
             deviceName: '/dev/sdh',
-            ebs: { volumeSize: 20 },
+            ebs: { volumeSize: 100 },
           },
         ],
         instanceMarketOptions: {
           marketType: 'spot',
           spotOptions: {
-            maxPrice: '0.10', // Specify your max spot price
+            maxPrice: '2.10', // Specify your max spot price
           },
         },
         // Remove tags by ensuring no tagSpecifications are passed
@@ -71,32 +93,17 @@ export class EC2Stack extends cdk.Stack {
       },
     });
 
-    /*
-    // Create the EC2 Spot Instance using the launch template
-    const instance = new ec2.CfnInstance(this, 'SpotInstance', {
-      launchTemplate: {
-        launchTemplateId: launchTemplate.ref,
-        version: launchTemplate.attrLatestVersionNumber, // Use latest version
+    const rule = new events.Rule(this, 'InstanceStateChangeRule', {
+      eventPattern: {
+        source: ['aws.ec2'],
+        detailType: ['EC2 Instance State-change Notification'],
+        detail: {
+          state: ['running'],
+        },
       },
-      subnetId: vpc.publicSubnets[0].subnetId,  // Use the appropriate subnet
-    });
-
-    // Manually create CloudWatch Alarm for CPUUtilization
-    const cpuUtilizationMetric = new cloudwatch.Metric({
-      namespace: 'AWS/EC2',
-      metricName: 'CPUUtilization',
-      dimensionsMap: {
-        InstanceId: instance.ref,
-      },
-    });
-
-    const alarm = new cloudwatch.Alarm(this, 'LowCpuAlarm', {
-      metric: cpuUtilizationMetric,
-      threshold: 5, // 5% CPU threshold
-      evaluationPeriods: 6, // 6 periods of 5 minutes = 30 minutes
-      datapointsToAlarm: 6
     });
     
+    rule.addTarget(new targets.LambdaFunction(configureCloudWatchLambda));
 
     // Create a Lambda function to stop the EC2 instance
     const stopInstanceLambda = new lambda.Function(this, 'StopInstanceLambda', {
@@ -106,8 +113,11 @@ export class EC2Stack extends cdk.Stack {
         import boto3
         def lambda_handler(event, context):
           ec2 = boto3.client('ec2')
-          ec2.stop_instances(InstanceIds=['${instance.ref}'])
+          ec2.stop_instances(InstanceIds=[os.environ['INSTANCE_ID']])
       `),
+      environment: {
+        INSTANCE_ID: 'placeholder', // This will be updated with actual InstanceId
+      }
     });
 
     // Give the Lambda function permission to stop the EC2 instance
@@ -116,8 +126,24 @@ export class EC2Stack extends cdk.Stack {
       resources: ['*'], // Can limit to specific instance if preferred
     }));
 
+    // Manually create CloudWatch Alarm for CPUUtilization
+    const cpuUtilizationMetric = new cloudwatch.Metric({
+      namespace: 'AWS/EC2',
+      metricName: 'CPUUtilization',
+      dimensionsMap: {
+        InstanceId: 'placeholder',  // This will need to be dynamically set when EC2 is launched
+      },
+    });
+
+    const alarm = new cloudwatch.Alarm(this, 'LowCpuAlarm', {
+      metric: cpuUtilizationMetric,
+      threshold: 5,  // 5% CPU threshold
+      evaluationPeriods: 6,  // 6 periods of 5 minutes = 30 minutes
+      datapointsToAlarm: 6
+    });
+
     // Trigger Lambda from CloudWatch Alarm
     alarm.addAlarmAction(new cloudwatch_actions.LambdaAction(stopInstanceLambda));
-    */
+    
   }
 }
