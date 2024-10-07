@@ -32,6 +32,8 @@ export class EC2Stack extends cdk.Stack {
             maxPrice: '0.10', // Specify your max spot price
           },
         },
+        // Remove tags by ensuring no tagSpecifications are passed
+        tagSpecifications: [],
       },
     });
 
@@ -80,5 +82,6 @@ export class EC2Stack extends cdk.Stack {
 
     // Trigger Lambda from CloudWatch Alarm
     alarm.addAlarmAction(new cloudwatch_actions.LambdaAction(stopInstanceLambda));
+
   }
 }
