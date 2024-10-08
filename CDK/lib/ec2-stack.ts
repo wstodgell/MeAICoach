@@ -43,7 +43,7 @@ export class EC2Stack extends cdk.Stack {
     // Create a Launch Template for Spot Instance
     const launchTemplate = new ec2.CfnLaunchTemplate(this, 'LaunchTemplate', {
       launchTemplateData: {
-        instanceType: 'g4dn.xlarge',
+        instanceType: 't3.micro', //'g4dn.xlarge', 
         imageId: new ec2.AmazonLinuxImage().getImage(this).imageId,
         userData: cdk.Fn.base64(`
           #!/bin/bash
