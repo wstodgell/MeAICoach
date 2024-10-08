@@ -170,11 +170,16 @@ def lambda_handler(event, context):
     new cdk.CfnOutput(this, 'StateMachineArn', { value: stateMachine.stateMachineArn });
 
  
-     // Step 4: Grant EC2 permissions to Lambda Functions
-     const ec2Permissions = new iam.PolicyStatement({
-      actions: ['ec2:RunInstances', 'ec2:AttachVolume', 'ec2:DescribeInstances'],
-      resources: ['*'],
-    });
+     // Create the EC2 permissions for AttachVolumeLambda
+const ec2Permissions = new iam.PolicyStatement({
+  actions: [
+    'ec2:RunInstances', 
+    'ec2:AttachVolume', 
+    'ec2:DescribeInstances',
+    'ec2:DescribeInstanceStatus'  // Add this permission
+  ],
+  resources: ['*'],
+});
     
     launchEc2Lambda.addToRolePolicy(ec2Permissions);
     attachVolumeLambda.addToRolePolicy(ec2Permissions);
