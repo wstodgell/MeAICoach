@@ -161,9 +161,14 @@ def lambda_handler(event, context):
 
     const updateStopLambdaTask = new tasks.LambdaInvoke(this, 'UpdateStopLambdaTask', {
       lambdaFunction: updateStopLambda,
-      inputPath: '$',  // Pass instance_id from previous task
+      inputPath: '$',  // Pass instance_id and function_name
       outputPath: '$.Payload',
+      payload: sfn.TaskInput.fromObject({
+        instance_id: sfn.JsonPath.stringAt('$.instance_id'),
+        function_name: 'StopInstanceLambda'  // Ensure the correct name or ARN is used here
+      }),
     });
+    
 
     // Configure Alarm Task - expects 'instance_id' from previous tasks
     const configureAlarmTask = new tasks.LambdaInvoke(this, 'ConfigureAlarmTask', {
