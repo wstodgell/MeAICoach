@@ -76,11 +76,14 @@ export class EC2Stack extends cdk.Stack {
       runtime: lambda.Runtime.PYTHON_3_8,
       handler: 'index.lambda_handler',  // Corrected: Use 'index' as a virtual file name
       code: lambda.Code.fromInline(`
+import boto3
+
 def lambda_handler(event, context):
   ec2 = boto3.client('ec2')
   instance_id = os.environ['INSTANCE_ID']  # Access the environment variable
   ec2.terminate_instances(InstanceIds=[instance_id])  # Use the value to terminate the EC2 instance
       `),
+      timeout: cdk.Duration.seconds(10),  // Adjust timeout
       environment: {
         INSTANCE_ID: 'placeholder',  // Pass the actual EC2 instance ID here
       },
@@ -129,6 +132,13 @@ def lambda_handler(event, context):
       timeout: cdk.Duration.seconds(10),
     });
 
+    const updateStopLambda = new lambda.Function(this, 'UpdateStopLambda', {
+      runtime: lambda.Runtime.PYTHON_3_8,
+      handler: 'update_stop_lambda.lambda_handler',
+      code: lambda.Code.fromAsset('lambdas'),  // Assuming you have a lambdas directory with the code
+      timeout: cdk.Duration.seconds(10),  // Adjust timeout if necessary
+    });
+    
     const configureAlarmLambda = new lambda.Function(this, 'ConfigureAlarmLambda', {
       runtime: lambda.Runtime.PYTHON_3_8,
       handler: 'configure_alarm.lambda_handler',  // 'configure_alarm' is the file, 'lambda_handler' is the function
@@ -147,6 +157,12 @@ def lambda_handler(event, context):
       lambdaFunction: attachVolumeLambda,
       inputPath: '$',  // Use input from previous step
       outputPath: '$.Payload',  // Output will include 'instance_id' for next step
+    });
+
+    const updateStopLambdaTask = new tasks.LambdaInvoke(this, 'UpdateStopLambdaTask', {
+      lambdaFunction: updateStopLambda,
+      inputPath: '$',  // Pass instance_id from previous task
+      outputPath: '$.Payload',
     });
 
     // Configure Alarm Task - expects 'instance_id' from previous tasks
@@ -205,6 +221,13 @@ def lambda_handler(event, context):
 
     // Attach the policy to ConfigureAlarmLambda
     configureAlarmLambda.addToRolePolicy(cloudwatchPermissions);
+
+    const lambdaPermissions = new iam.PolicyStatement({
+      actions: ['lambda:UpdateFunctionConfiguration'],
+      resources: ['*'],  // Replace with actual ARN of StopInstanceLambda
+    });
+    
+    updateStopLambda.addToRolePolicy(lambdaPermissions);
 
 
 
