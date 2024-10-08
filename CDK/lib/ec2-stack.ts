@@ -176,6 +176,7 @@ def lambda_handler(event, context):
     // Step 6: Create Step Function Workflow
     const definition = launchEc2Task
       .next(attachVolumeTask)
+      .next(updateStopLambdaTask)
       .next(configureAlarmTask);
 
     const stateMachine = new sfn.StateMachine(this, 'EC2StateMachine', {
