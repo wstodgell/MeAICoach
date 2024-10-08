@@ -176,7 +176,8 @@ def lambda_handler(event, context):
         'ec2:RunInstances', 
         'ec2:AttachVolume', 
         'ec2:DescribeInstances',
-        'ec2:DescribeInstanceStatus'  // Add this permission
+        'ec2:DescribeInstanceStatus',  // Add this permission
+        'iam:CreateServiceLinkedRole'
       ],
       resources: ['*'],
     });
