@@ -117,81 +117,23 @@ def lambda_handler(event, context):
     // Lambda for launching EC2 instance
     const launchEc2Lambda = new lambda.Function(this, 'LaunchEC2Lambda', {
       runtime: lambda.Runtime.PYTHON_3_8,
-      handler: 'launch_ec2.lambda_handler',
-      code: lambda.Code.fromInline(`
-        import boto3
-        import os
-
-        def get_parameter(name):
-            ssm = boto3.client('ssm')
-            return ssm.get_parameter(Name=name)['Parameter']['Value']
-
-        def lambda_handler(event, context):
-            ec2 = boto3.client('ec2')
-            launch_template_id = get_parameter('/ai-model/launch-template-id')
-            subnet_id = get_parameter('/ai-model/public-subnet-id')
-            security_group_id = get_parameter('/ai-model/security-group-id')
-            
-            response = ec2.run_instances(
-                LaunchTemplate={'LaunchTemplateId': launch_template_id},
-                MinCount=1,
-                MaxCount=1,
-                SubnetId=subnet_id,
-                SecurityGroupIds=[security_group_id]
-            )
-            instance_id = response['Instances'][0]['InstanceId']
-            return {'instance_id': instance_id}
-      `),
-      environment: {
-        INSTANCE_ID: 'placeholder',
-      },
+      handler: 'launch_ec2.lambda_handler',  // 'launch_ec2' is the file, 'lambda_handler' is the function
+      code: lambda.Code.fromAsset('lambdas'),  // Point to the 'lambdas' directory
+      timeout: cdk.Duration.seconds(10),  // Adjust timeout
     });
 
-    // Lambda for attaching EBS volume
     const attachVolumeLambda = new lambda.Function(this, 'AttachVolumeLambda', {
       runtime: lambda.Runtime.PYTHON_3_8,
-      handler: 'attach_volume.lambda_handler',
-      code: lambda.Code.fromInline(`
-        import boto3
-
-        def get_parameter(name):
-            ssm = boto3.client('ssm')
-            return ssm.get_parameter(Name=name)['Parameter']['Value']
-
-        def lambda_handler(event, context):
-            ec2 = boto3.client('ec2')
-            volume_id = get_parameter('/ai-model/volume-id')
-            instance_id = event['instance_id']
-            ec2.attach_volume(VolumeId=volume_id, InstanceId=instance_id, Device='/dev/sdh')
-            return {'status': 'volume_attached'}
-      `),
+      handler: 'attach_volume.lambda_handler',  // 'attach_volume' is the file, 'lambda_handler' is the function
+      code: lambda.Code.fromAsset('lambdas'),  // Same directory
+      timeout: cdk.Duration.seconds(10),
     });
 
-    // Lambda for configuring CloudWatch alarms
     const configureAlarmLambda = new lambda.Function(this, 'ConfigureAlarmLambda', {
       runtime: lambda.Runtime.PYTHON_3_8,
-      handler: 'configure_alarm.lambda_handler',
-      code: lambda.Code.fromInline(`
-        import boto3
-        import os
-
-        def lambda_handler(event, context):
-            cloudwatch = boto3.client('cloudwatch')
-            instance_id = event['instance_id']
-            cloudwatch.put_metric_alarm(
-                AlarmName='LowCpuAlarm',
-                MetricName='CPUUtilization',
-                Namespace='AWS/EC2',
-                Statistic='Average',
-                Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
-                Period=300,
-                EvaluationPeriods=6,
-                Threshold=5,
-                ComparisonOperator='LessThanThreshold',
-                AlarmActions=[]
-            )
-            return {'statusCode': 200, 'body': 'Alarm created'}
-      `),
+      handler: 'configure_alarm.lambda_handler',  // 'configure_alarm' is the file, 'lambda_handler' is the function
+      code: lambda.Code.fromAsset('lambdas'),
+      timeout: cdk.Duration.seconds(10),
     });
 
     // Step 4: Grant EC2 permissions to Lambda Functions
