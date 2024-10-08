@@ -116,6 +116,12 @@ def lambda_handler(event, context):
       stringValue: vpc.publicSubnets[0].subnetId,  // Store VPC public subnet ID
     });
 
+    // Store the function name in SSM Parameter Store
+    new ssm.StringParameter(this, 'StopLambdaFunctionName', {
+      parameterName: '/ai-model/stop-lambda-function-name',
+      stringValue: stopInstanceLambda.functionName,
+    });
+
     ///*************** Launch Sequence */
     // Lambda for launching EC2 instance
     const launchEc2Lambda = new lambda.Function(this, 'LaunchEC2Lambda', {
@@ -129,7 +135,7 @@ def lambda_handler(event, context):
       runtime: lambda.Runtime.PYTHON_3_8,
       handler: 'attach_volume.lambda_handler',  // 'attach_volume' is the file, 'lambda_handler' is the function
       code: lambda.Code.fromAsset('lambdas'),  // Same directory
-      timeout: cdk.Duration.seconds(10),
+      timeout: cdk.Duration.seconds(60), // longer because it may take a while for ec2 to up and run
     });
 
     const updateStopLambda = new lambda.Function(this, 'UpdateStopLambda', {
@@ -161,11 +167,11 @@ def lambda_handler(event, context):
 
     const updateStopLambdaTask = new tasks.LambdaInvoke(this, 'UpdateStopLambdaTask', {
       lambdaFunction: updateStopLambda,
-      inputPath: '$',  // Pass instance_id and function_name
+      inputPath: '$',
       outputPath: '$.Payload',
       payload: sfn.TaskInput.fromObject({
         instance_id: sfn.JsonPath.stringAt('$.instance_id'),
-        function_name: 'StopInstanceLambda'  // Ensure the correct name or ARN is used here
+        function_name: stopInstanceLambda.functionName  // Dynamically pass function name
       }),
     });
     
@@ -216,6 +222,7 @@ def lambda_handler(event, context):
     // Add these policies to the Lambda role
     launchEc2Lambda.addToRolePolicy(ssmPermissions);
     attachVolumeLambda.addToRolePolicy(ssmPermissions);
+    updateStopLambda.addToRolePolicy(ssmPermissions);
 
     // Add CloudWatch permissions to ConfigureAlarmLambda
     const cloudwatchPermissions = new iam.PolicyStatement({
