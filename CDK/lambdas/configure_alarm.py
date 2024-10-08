@@ -1,9 +1,10 @@
 import boto3
-import os
 
 def lambda_handler(event, context):
     cloudwatch = boto3.client('cloudwatch')
-    instance_id = event['instance_id']
+    instance_id = event['instance_id']  # Retrieve instance_id from the previous step
+    
+    # Create CloudWatch Alarm
     cloudwatch.put_metric_alarm(
         AlarmName='LowCpuAlarm',
         MetricName='CPUUtilization',
@@ -16,4 +17,5 @@ def lambda_handler(event, context):
         ComparisonOperator='LessThanThreshold',
         AlarmActions=[]
     )
+    
     return {'statusCode': 200, 'body': 'Alarm created'}

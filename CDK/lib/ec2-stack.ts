@@ -136,23 +136,26 @@ def lambda_handler(event, context):
       timeout: cdk.Duration.seconds(10),
     });
 
-    // Step 5: Define Step Function Tasks
+    // Launch EC2 Task - will pass 'instance_id' to the next task
     const launchEc2Task = new tasks.LambdaInvoke(this, 'LaunchEC2Task', {
       lambdaFunction: launchEc2Lambda,
-      outputPath: '$.Payload',
+      outputPath: '$.Payload',  // Output the payload which includes 'instance_id'
     });
 
+    // Attach Volume Task - will pass 'instance_id' along with 'volume_attached' status
     const attachVolumeTask = new tasks.LambdaInvoke(this, 'AttachVolumeTask', {
       lambdaFunction: attachVolumeLambda,
-      inputPath: '$',
+      inputPath: '$',  // Use input from previous step
+      outputPath: '$.Payload',  // Output will include 'instance_id' for next step
+    });
+
+    // Configure Alarm Task - expects 'instance_id' from previous tasks
+    const configureAlarmTask = new tasks.LambdaInvoke(this, 'ConfigureAlarmTask', {
+      lambdaFunction: configureAlarmLambda,
+      inputPath: '$',  // Use input from the AttachVolumeTask
       outputPath: '$.Payload',
     });
 
-    const configureAlarmTask = new tasks.LambdaInvoke(this, 'ConfigureAlarmTask', {
-      lambdaFunction: configureAlarmLambda,
-      inputPath: '$',
-      outputPath: '$.Payload',
-    });
 
     // Step 6: Create Step Function Workflow
     const definition = launchEc2Task
