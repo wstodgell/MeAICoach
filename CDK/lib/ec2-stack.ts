@@ -108,21 +108,21 @@ export class EC2Stack extends cdk.Stack {
     // Create a Lambda function to stop the EC2 instance
     const stopInstanceLambda = new lambda.Function(this, 'StopInstanceLambda', {
       runtime: lambda.Runtime.PYTHON_3_8,
-      handler: 'stop_instance.lambda_handler',
+      handler: 'index.lambda_handler',  // Corrected: Use 'index' as a virtual file name
       code: lambda.Code.fromInline(`
         import boto3
         def lambda_handler(event, context):
-          ec2 = boto3.client('ec2')
-          ec2.stop_instances(InstanceIds=[os.environ['INSTANCE_ID']])
+            ec2 = boto3.client('ec2')
+            ec2.terminate_instances(InstanceIds=['i-011f57f22e39a1d03'])
       `),
       environment: {
-        INSTANCE_ID: 'placeholder', // This will be updated with actual InstanceId
-      }
+        INSTANCE_ID: 'placeholder',  // Pass the actual EC2 instance ID here
+      },
     });
 
     // Give the Lambda function permission to stop the EC2 instance
     stopInstanceLambda.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ec2:StopInstances'],
+      actions: ['ec2:TerminateInstances'],
       resources: ['*'], // Can limit to specific instance if preferred
     }));
 
