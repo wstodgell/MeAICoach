@@ -136,15 +136,6 @@ def lambda_handler(event, context):
       timeout: cdk.Duration.seconds(10),
     });
 
-    // Step 4: Grant EC2 permissions to Lambda Functions
-    const ec2Permissions = new iam.PolicyStatement({
-      actions: ['ec2:RunInstances', 'ec2:AttachVolume', 'ec2:DescribeInstances'],
-      resources: ['*'],
-    });
-    launchEc2Lambda.addToRolePolicy(ec2Permissions);
-    attachVolumeLambda.addToRolePolicy(ec2Permissions);
-    configureAlarmLambda.addToRolePolicy(ec2Permissions);
-
     // Step 5: Define Step Function Tasks
     const launchEc2Task = new tasks.LambdaInvoke(this, 'LaunchEC2Task', {
       lambdaFunction: launchEc2Lambda,
@@ -174,6 +165,26 @@ def lambda_handler(event, context):
     });
 
     new cdk.CfnOutput(this, 'StateMachineArn', { value: stateMachine.stateMachineArn });
+
+ 
+     // Step 4: Grant EC2 permissions to Lambda Functions
+     const ec2Permissions = new iam.PolicyStatement({
+      actions: ['ec2:RunInstances', 'ec2:AttachVolume', 'ec2:DescribeInstances'],
+      resources: ['*'],
+    });
+    
+    launchEc2Lambda.addToRolePolicy(ec2Permissions);
+    attachVolumeLambda.addToRolePolicy(ec2Permissions);
+    configureAlarmLambda.addToRolePolicy(ec2Permissions);
+    
+    const ssmPermissions = new iam.PolicyStatement({
+      actions: ['ssm:GetParameter'],  // Allow GetParameter access
+      resources: ['*'],  // Grant access to all SSM parameters
+    });
+    
+    // Add these policies to the Lambda role
+    launchEc2Lambda.addToRolePolicy(ssmPermissions);
+    attachVolumeLambda.addToRolePolicy(ssmPermissions);
 
 
 
