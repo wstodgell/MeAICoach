@@ -171,15 +171,15 @@ def lambda_handler(event, context):
 
  
      // Create the EC2 permissions for AttachVolumeLambda
-const ec2Permissions = new iam.PolicyStatement({
-  actions: [
-    'ec2:RunInstances', 
-    'ec2:AttachVolume', 
-    'ec2:DescribeInstances',
-    'ec2:DescribeInstanceStatus'  // Add this permission
-  ],
-  resources: ['*'],
-});
+    const ec2Permissions = new iam.PolicyStatement({
+      actions: [
+        'ec2:RunInstances', 
+        'ec2:AttachVolume', 
+        'ec2:DescribeInstances',
+        'ec2:DescribeInstanceStatus'  // Add this permission
+      ],
+      resources: ['*'],
+    });
     
     launchEc2Lambda.addToRolePolicy(ec2Permissions);
     attachVolumeLambda.addToRolePolicy(ec2Permissions);
@@ -193,6 +193,17 @@ const ec2Permissions = new iam.PolicyStatement({
     // Add these policies to the Lambda role
     launchEc2Lambda.addToRolePolicy(ssmPermissions);
     attachVolumeLambda.addToRolePolicy(ssmPermissions);
+
+    // Add CloudWatch permissions to ConfigureAlarmLambda
+    const cloudwatchPermissions = new iam.PolicyStatement({
+      actions: [
+        'cloudwatch:PutMetricAlarm',  // Allow creating CloudWatch alarms
+      ],
+      resources: ['*'],  // Optionally, restrict to a specific resource or use '*' for all resources
+    });
+
+    // Attach the policy to ConfigureAlarmLambda
+    configureAlarmLambda.addToRolePolicy(cloudwatchPermissions);
 
 
 
