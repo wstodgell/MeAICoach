@@ -159,7 +159,7 @@ export class EC2Stack extends cdk.Stack {
       lambdaFunction: launchEc2Lambda,
       outputPath: '$.Payload',  // Output the payload which includes 'instance_id'
       payload: sfn.TaskInput.fromObject({
-        launch_template_id: sfn.JsonPath.stringAt('$.launch_template_id'),
+        launch_template_id: sfn.JsonPath.stringAt('$.Payload.launch_template_id'),  // Use the correct JSONPath for the returned launch_template_id
         subnet_id: sfn.JsonPath.stringAt('$.subnet_id'),
         security_group_id: sfn.JsonPath.stringAt('$.security_group_id'),
       }),
