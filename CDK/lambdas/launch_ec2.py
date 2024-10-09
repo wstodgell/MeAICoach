@@ -45,4 +45,8 @@ def lambda_handler(event, context):
     )
 
     instance_id = response['Instances'][0]['InstanceId']
-    return {'instance_id': instance_id, 'key_pair_name': key_pair_name}
+    return {
+        'instance_id': instance_id,
+        'key_pair_name': key_pair_name,
+        'launch_template_id': launch_template_id  # Include launch_template_id in the return
+    }
