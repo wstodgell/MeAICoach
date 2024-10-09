@@ -209,7 +209,8 @@ export class EC2Stack extends cdk.Stack {
         'ec2:AttachVolume', 
         'ec2:DescribeInstances',
         'ec2:DescribeInstanceStatus',  // Add this permission
-        'iam:CreateServiceLinkedRole'
+        'iam:CreateServiceLinkedRole',
+        'ec2:CreateKeyPair'
       ],
       resources: ['*'],
     });
