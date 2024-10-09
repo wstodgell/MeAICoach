@@ -154,15 +154,11 @@ export class EC2Stack extends cdk.Stack {
       timeout: cdk.Duration.seconds(10),
     });
 
-    // Launch EC2 Task - will pass 'instance_id' to the next task
+
+    // *************************** CONFIGURE TASKS **************** //
     const launchEc2Task = new tasks.LambdaInvoke(this, 'LaunchEC2Task', {
       lambdaFunction: launchEc2Lambda,
-      outputPath: '$.Payload',  // Output the payload which includes 'instance_id'
-      payload: sfn.TaskInput.fromObject({
-        launch_template_id: sfn.JsonPath.stringAt('$.Payload.launch_template_id'),  // Use the correct JSONPath for the returned launch_template_id
-        subnet_id: sfn.JsonPath.stringAt('$.subnet_id'),
-        security_group_id: sfn.JsonPath.stringAt('$.security_group_id'),
-      }),
+      outputPath: '$.Payload',  // This ensures that the output comes from the Payload of the Lambda
     });
 
     // Attach Volume Task - will pass 'instance_id' along with 'volume_attached' status

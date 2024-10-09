@@ -1,5 +1,6 @@
 import boto3
 import os
+import json
 
 def get_parameter(name):
     ssm = boto3.client('ssm')
@@ -45,8 +46,11 @@ def lambda_handler(event, context):
     )
 
     instance_id = response['Instances'][0]['InstanceId']
-    return {
+    result = {
         'instance_id': instance_id,
         'key_pair_name': key_pair_name,
         'launch_template_id': launch_template_id  # Include launch_template_id in the return
     }
+    print(json.dumps(result))  # Log the result
+    return result
+
