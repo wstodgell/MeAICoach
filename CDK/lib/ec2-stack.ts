@@ -31,7 +31,7 @@ export class EC2Stack extends cdk.Stack {
     securityGroup.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(80), 'Allow HTTP access');
 
     // Step 3: Create a separate EBS volume
-    const volume = new ec2.CfnVolume(this, 'MyEBSVolume', {
+    const volume = new ec2.CfnVolume(this, 'LlamaEBSVolume', {
       availabilityZone: 'us-east-1a',  // Ensure it's in the same AZ as the instance
       size: 100,  // Size in GB
       volumeType: 'gp3',  // General-purpose SSD
@@ -58,7 +58,7 @@ export class EC2Stack extends cdk.Stack {
           pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 
           # Install Huggingface Transformers for LLaMA
-          pip3 install transformers accelerate
+          pip3 install transformers accelerate sentencepiece
         `),
         instanceMarketOptions: {
           marketType: 'spot',
@@ -74,24 +74,27 @@ export class EC2Stack extends cdk.Stack {
     // Create a Lambda function to stop the EC2 instance
     const stopInstanceLambda = new lambda.Function(this, 'StopInstanceLambda', {
       runtime: lambda.Runtime.PYTHON_3_8,
-      handler: 'index.lambda_handler',  // Corrected: Use 'index' as a virtual file name
-      code: lambda.Code.fromInline(`
-import boto3
-
-def lambda_handler(event, context):
-  ec2 = boto3.client('ec2')
-  instance_id = os.environ['INSTANCE_ID']  # Access the environment variable
-  ec2.terminate_instances(InstanceIds=[instance_id])  # Use the value to terminate the EC2 instance
-      `),
+      handler: 'terminate_ec2.lambda_handler',  // Corrected: Use 'index' as a virtual file name
+      code: lambda.Code.fromAsset('lambdas'),  // Point to the 'lambdas' directory
       timeout: cdk.Duration.seconds(10),  // Adjust timeout
-      environment: {
-        INSTANCE_ID: 'placeholder',  // Pass the actual EC2 instance ID here
-      },
+    });
+
+    ///*************** Launch Sequence */
+    // Lambda for launching EC2 instance
+    const stopInstanceLambda2 = new lambda.Function(this, 'LaunchEC2Lambda', {
+      runtime: lambda.Runtime.PYTHON_3_8,
+      handler: 'launch_ec2.lambda_handler',  // 'launch_ec2' is the file, 'lambda_handler' is the function
+      code: lambda.Code.fromAsset('lambdas'),  // Point to the 'lambdas' directory
+      timeout: cdk.Duration.seconds(10),  // Adjust timeout
     });
 
     // Give the Lambda function permission to stop the EC2 instance
     stopInstanceLambda.addToRolePolicy(new iam.PolicyStatement({
-      actions: ['ec2:TerminateInstances'],
+      actions: [
+        'ec2:TerminateInstances',       // Permission to terminate EC2 instance
+        'cloudwatch:DeleteAlarms',     // Permission to delete CloudWatch alarms
+        'ssm:GetParameter'               // Permission to retrieve alarm name from SSM Parameter Store
+      ],
       resources: ['*'], // Can limit to specific instance if preferred
     }));
 
@@ -120,6 +123,11 @@ def lambda_handler(event, context):
     new ssm.StringParameter(this, 'StopLambdaFunctionName', {
       parameterName: '/ai-model/stop-lambda-function-name',
       stringValue: stopInstanceLambda.functionName,
+    });
+
+    new ssm.StringParameter(this, 'CloudWatchAlarmNameParameter', {
+      parameterName: '/ai-model/cloudwatch-alarm-name',
+      stringValue: 'MyCloudWatchAlarm',  // Replace with actual alarm name
     });
 
     ///*************** Launch Sequence */
@@ -156,6 +164,11 @@ def lambda_handler(event, context):
     const launchEc2Task = new tasks.LambdaInvoke(this, 'LaunchEC2Task', {
       lambdaFunction: launchEc2Lambda,
       outputPath: '$.Payload',  // Output the payload which includes 'instance_id'
+      payload: sfn.TaskInput.fromObject({
+        launch_template_id: sfn.JsonPath.stringAt('$.launch_template_id'),
+        subnet_id: sfn.JsonPath.stringAt('$.subnet_id'),
+        security_group_id: sfn.JsonPath.stringAt('$.security_group_id'),
+      }),
     });
 
     // Attach Volume Task - will pass 'instance_id' along with 'volume_attached' status
@@ -166,12 +179,13 @@ def lambda_handler(event, context):
     });
 
     const updateStopLambdaTask = new tasks.LambdaInvoke(this, 'UpdateStopLambdaTask', {
-      lambdaFunction: updateStopLambda,
+      lambdaFunction: updateStopLambda,  // Using 'updateStopLambda' function
       inputPath: '$',
       outputPath: '$.Payload',
       payload: sfn.TaskInput.fromObject({
-        instance_id: sfn.JsonPath.stringAt('$.instance_id'),
-        function_name: stopInstanceLambda.functionName  // Dynamically pass function name
+        instance_id: sfn.JsonPath.stringAt('$.instance_id'),       // Pass the instance ID
+        alarm_name: sfn.JsonPath.stringAt('$.alarm_name'),         // Pass the CloudWatch alarm name
+        function_name: stopInstanceLambda.functionName             // Dynamically pass the stop Lambda function name
       }),
     });
     
@@ -242,8 +256,13 @@ def lambda_handler(event, context):
     
     updateStopLambda.addToRolePolicy(lambdaPermissions);
 
-
-
+    const key = new ec2.CfnKeyPair(this, 'MyKeyPair', {
+      keyName: 'my-key-pair',
+    });
     
+    new cdk.CfnOutput(this, 'KeyPairName', {
+      value: key.keyName,
+      description: 'Key Pair for SSH access',
+    });
   }
 }
