@@ -249,14 +249,5 @@ export class EC2Stack extends cdk.Stack {
     });
     
     updateStopLambda.addToRolePolicy(lambdaPermissions);
-
-    const key = new ec2.CfnKeyPair(this, 'MyKeyPair', {
-      keyName: 'my-key-pair',
-    });
-    
-    new cdk.CfnOutput(this, 'KeyPairName', {
-      value: key.keyName,
-      description: 'Key Pair for SSH access',
-    });
   }
 }
