@@ -81,12 +81,6 @@ export class EC2Stack extends cdk.Stack {
 
     ///*************** Launch Sequence */
     // Lambda for launching EC2 instance
-    const stopInstanceLambda2 = new lambda.Function(this, 'LaunchEC2Lambda', {
-      runtime: lambda.Runtime.PYTHON_3_8,
-      handler: 'launch_ec2.lambda_handler',  // 'launch_ec2' is the file, 'lambda_handler' is the function
-      code: lambda.Code.fromAsset('lambdas'),  // Point to the 'lambdas' directory
-      timeout: cdk.Duration.seconds(10),  // Adjust timeout
-    });
 
     // Give the Lambda function permission to stop the EC2 instance
     stopInstanceLambda.addToRolePolicy(new iam.PolicyStatement({
