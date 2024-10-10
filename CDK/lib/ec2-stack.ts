@@ -146,7 +146,10 @@ export class EC2Stack extends cdk.Stack {
     configureAlarmLambda.addToRolePolicy(ec2Permissions);
     
     const ssmPermissions = new iam.PolicyStatement({
-      actions: ['ssm:GetParameter'],  // Allow GetParameter access
+      actions: [
+        "ssm:GetParameter",
+        "ssm:PutParameter"
+    ], 
       resources: ['*'],  // Grant access to all SSM parameters
     });
     
@@ -154,6 +157,7 @@ export class EC2Stack extends cdk.Stack {
     launchEc2Lambda.addToRolePolicy(ssmPermissions);
     attachVolumeLambda.addToRolePolicy(ssmPermissions);
     updateStopLambda.addToRolePolicy(ssmPermissions);
+    configureAlarmLambda.addToRolePolicy(ssmPermissions);
 
     // Add CloudWatch permissions to ConfigureAlarmLambda
     const cloudwatchPermissions = new iam.PolicyStatement({
