@@ -37,7 +37,7 @@ export class EC2Stack extends cdk.Stack {
       volumeType: 'gp3',  // General-purpose SSD
     });
 
-    // You can also tag the volume for easy identification later
+    // Tag the EBS Volume
     cdk.Tags.of(volume).add('Name', 'LLamaDataVolume');
 
     // Create a Launch Template for Spot Instance
@@ -71,6 +71,16 @@ export class EC2Stack extends cdk.Stack {
       },
     });
 
+    
+
+    ///*************** Launch Sequence */
+    // Lambda for launching EC2 instance
+
+    // Give the Lambda function permission to stop the EC2 instance
+   
+    ///*************** DEFINE LAMBDA'S
+    // Lambda for launching EC2 instance
+
     // Create a Lambda function to stop the EC2 instance
     const stopInstanceLambda = new lambda.Function(this, 'StopInstanceLambda', {
       runtime: lambda.Runtime.PYTHON_3_8,
@@ -79,53 +89,6 @@ export class EC2Stack extends cdk.Stack {
       timeout: cdk.Duration.seconds(10),  // Adjust timeout
     });
 
-    ///*************** Launch Sequence */
-    // Lambda for launching EC2 instance
-
-    // Give the Lambda function permission to stop the EC2 instance
-    stopInstanceLambda.addToRolePolicy(new iam.PolicyStatement({
-      actions: [
-        'ec2:TerminateInstances',       // Permission to terminate EC2 instance
-        'cloudwatch:DeleteAlarms',     // Permission to delete CloudWatch alarms
-        'ssm:GetParameter'               // Permission to retrieve alarm name from SSM Parameter Store
-      ],
-      resources: ['*'], // Can limit to specific instance if preferred
-    }));
-
-    // Step 8: Store important values in Parameter Store
-    new ssm.StringParameter(this, 'LaunchTemplateIdParameter', {
-      parameterName: '/ai-model/launch-template-id',
-      stringValue: launchTemplate.ref,  // Store Launch Template ID
-    });
-
-    new ssm.StringParameter(this, 'SecurityGroupIdParameter', {
-      parameterName: '/ai-model/security-group-id',
-      stringValue: securityGroup.securityGroupId,  // Store Security Group ID
-    });
-
-    new ssm.StringParameter(this, 'VolumeIdParameter', {
-      parameterName: '/ai-model/volume-id',
-      stringValue: volume.ref,  // Store EBS Volume ID
-    });
-
-    new ssm.StringParameter(this, 'VpcPublicSubnetIdParameter', {
-      parameterName: '/ai-model/public-subnet-id',
-      stringValue: vpc.publicSubnets[0].subnetId,  // Store VPC public subnet ID
-    });
-
-    // Store the function name in SSM Parameter Store
-    new ssm.StringParameter(this, 'StopLambdaFunctionName', {
-      parameterName: '/ai-model/stop-lambda-function-name',
-      stringValue: stopInstanceLambda.functionName,
-    });
-
-    new ssm.StringParameter(this, 'CloudWatchAlarmNameParameter', {
-      parameterName: '/ai-model/cloudwatch-alarm-name',
-      stringValue: 'MyCloudWatchAlarm',  // Replace with actual alarm name
-    });
-
-    ///*************** Launch Sequence */
-    // Lambda for launching EC2 instance
     const launchEc2Lambda = new lambda.Function(this, 'LaunchEC2Lambda', {
       runtime: lambda.Runtime.PYTHON_3_8,
       handler: 'launch_ec2.lambda_handler',  // 'launch_ec2' is the file, 'lambda_handler' is the function
@@ -154,54 +117,17 @@ export class EC2Stack extends cdk.Stack {
       timeout: cdk.Duration.seconds(10),
     });
 
+    // ******************* Add necessary permissions to Lambdas
 
-    // *************************** CONFIGURE TASKS **************** //
-    const launchEc2Task = new tasks.LambdaInvoke(this, 'LaunchEC2Task', {
-      lambdaFunction: launchEc2Lambda,
-      outputPath: '$.Payload',  // This ensures that the output comes from the Payload of the Lambda
-    });
+    stopInstanceLambda.addToRolePolicy(new iam.PolicyStatement({
+      actions: [
+        'ec2:TerminateInstances',       // Permission to terminate EC2 instance
+        'cloudwatch:DeleteAlarms',     // Permission to delete CloudWatch alarms
+        'ssm:GetParameter'               // Permission to retrieve alarm name from SSM Parameter Store
+      ],
+      resources: ['*'], // Can limit to specific instance if preferred
+    }));
 
-    // Attach Volume Task - will pass 'instance_id' along with 'volume_attached' status
-    const attachVolumeTask = new tasks.LambdaInvoke(this, 'AttachVolumeTask', {
-      lambdaFunction: attachVolumeLambda,
-      inputPath: '$',  // Use input from previous step
-      outputPath: '$.Payload',  // Output will include 'instance_id' for next step
-    });
-
-    const updateStopLambdaTask = new tasks.LambdaInvoke(this, 'UpdateStopLambdaTask', {
-      lambdaFunction: updateStopLambda,  // Using 'updateStopLambda' function
-      inputPath: '$',
-      outputPath: '$.Payload',
-      payload: sfn.TaskInput.fromObject({
-        instance_id: sfn.JsonPath.stringAt('$.instance_id'),       // Pass the instance ID
-        alarm_name: sfn.JsonPath.stringAt('$.alarm_name'),         // Pass the CloudWatch alarm name
-        function_name: stopInstanceLambda.functionName             // Dynamically pass the stop Lambda function name
-      }),
-    });
-    
-
-    // Configure Alarm Task - expects 'instance_id' from previous tasks
-    const configureAlarmTask = new tasks.LambdaInvoke(this, 'ConfigureAlarmTask', {
-      lambdaFunction: configureAlarmLambda,
-      inputPath: '$',  // Use input from the AttachVolumeTask
-      outputPath: '$.Payload',
-    });
-
-
-    // Step 6: Create Step Function Workflow
-    const definition = launchEc2Task
-      .next(attachVolumeTask)
-      .next(updateStopLambdaTask)
-      .next(configureAlarmTask);
-
-    const stateMachine = new sfn.StateMachine(this, 'EC2StateMachine', {
-      definition,
-      timeout: cdk.Duration.minutes(5),
-    });
-
-    new cdk.CfnOutput(this, 'StateMachineArn', { value: stateMachine.stateMachineArn });
-
- 
      // Create the EC2 permissions for AttachVolumeLambda
     const ec2Permissions = new iam.PolicyStatement({
       actions: [
@@ -246,6 +172,83 @@ export class EC2Stack extends cdk.Stack {
     });
     
     updateStopLambda.addToRolePolicy(lambdaPermissions);
+
+    // *************************** CONFIGURE TASKS **************** //
+    const launchEc2Task = new tasks.LambdaInvoke(this, 'LaunchEC2Task', {
+      lambdaFunction: launchEc2Lambda,
+      outputPath: '$.Payload',  // This ensures that the output comes from the Payload of the Lambda
+    });
+
+    // Attach Volume Task - will pass 'instance_id' along with 'volume_attached' status
+    const attachVolumeTask = new tasks.LambdaInvoke(this, 'AttachVolumeTask', {
+      lambdaFunction: attachVolumeLambda,
+      inputPath: '$',  // Use input from previous step
+      outputPath: '$.Payload',  // Output will include 'instance_id' for next step
+    });
+
+    const updateStopLambdaTask = new tasks.LambdaInvoke(this, 'UpdateStopLambdaTask', {
+      lambdaFunction: updateStopLambda,  // Using 'updateStopLambda' function
+      inputPath: '$',
+      outputPath: '$.Payload',
+      payload: sfn.TaskInput.fromObject({
+        instance_id: sfn.JsonPath.stringAt('$.instance_id'),       // Pass the instance ID
+        function_name: stopInstanceLambda.functionName             // Dynamically pass the stop Lambda function name
+      }),
+    });
+    
+    // Configure Alarm Task - expects 'instance_id' from previous tasks
+    const configureAlarmTask = new tasks.LambdaInvoke(this, 'ConfigureAlarmTask', {
+      lambdaFunction: configureAlarmLambda,
+      inputPath: '$',  // Use input from the AttachVolumeTask
+      outputPath: '$.Payload',
+    });
+
+
+    // Step 6: Create Step Function Workflow
+    const definition = launchEc2Task
+      .next(attachVolumeTask)
+      .next(updateStopLambdaTask)
+      .next(configureAlarmTask);
+
+    const stateMachine = new sfn.StateMachine(this, 'EC2StateMachine', {
+      definition,
+      timeout: cdk.Duration.minutes(5),
+    });
+
+    new cdk.CfnOutput(this, 'StateMachineArn', { value: stateMachine.stateMachineArn });
+
+    // ****************** Add created resources to parameter store
+     new ssm.StringParameter(this, 'LaunchTemplateIdParameter', {
+      parameterName: '/ai-model/launch-template-id',
+      stringValue: launchTemplate.ref,  // Store Launch Template ID
+    });
+
+    new ssm.StringParameter(this, 'SecurityGroupIdParameter', {
+      parameterName: '/ai-model/security-group-id',
+      stringValue: securityGroup.securityGroupId,  // Store Security Group ID
+    });
+
+    new ssm.StringParameter(this, 'VolumeIdParameter', {
+      parameterName: '/ai-model/volume-id',
+      stringValue: volume.ref,  // Store EBS Volume ID
+    });
+
+    new ssm.StringParameter(this, 'VpcPublicSubnetIdParameter', {
+      parameterName: '/ai-model/public-subnet-id',
+      stringValue: vpc.publicSubnets[0].subnetId,  // Store VPC public subnet ID
+    });
+
+    // Store the function name in SSM Parameter Store
+    new ssm.StringParameter(this, 'StopLambdaFunctionName', {
+      parameterName: '/ai-model/stop-lambda-function-name',
+      stringValue: stopInstanceLambda.functionName,
+    });
+
+    new ssm.StringParameter(this, 'CloudWatchAlarmNameParameter', {
+      parameterName: '/ai-model/cloudwatch-alarm-name',
+      stringValue: 'MyCloudWatchAlarm',  // Replace with actual alarm name
+    });
+
 
     const key = new ec2.CfnKeyPair(this, 'MyKeyPair', {
       keyName: 'my-key-pair',
