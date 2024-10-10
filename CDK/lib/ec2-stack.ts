@@ -249,6 +249,11 @@ export class EC2Stack extends cdk.Stack {
       stringValue: 'MyCloudWatchAlarm',  // Replace with actual alarm name
     });
 
+    new ssm.StringParameter(this, 'StopLambdaArnParameter', {
+      parameterName: '/ai-model/stop-lambda-arn',
+      stringValue: stopInstanceLambda.functionArn,  // Store the ARN of the StopInstanceLambda
+    });
+
 
     const key = new ec2.CfnKeyPair(this, 'MyKeyPair', {
       keyName: 'my-key-pair',
