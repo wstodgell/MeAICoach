@@ -45,7 +45,7 @@ export class EC2Stack extends cdk.Stack {
       launchTemplateData: {
         instanceType: 't3.micro', //'g4dn.xlarge', 
         imageId: new ec2.AmazonLinuxImage({
-          generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2, // Specify Amazon Linux 2
+          generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023, // Use Amazon Linux 2023
         }).getImage(this).imageId,
         userData: cdk.Fn.base64(`
           #!/bin/bash
