@@ -44,7 +44,9 @@ export class EC2Stack extends cdk.Stack {
     const launchTemplate = new ec2.CfnLaunchTemplate(this, 'LaunchTemplate', {
       launchTemplateData: {
         instanceType: 't3.micro', //'g4dn.xlarge', 
-        imageId: new ec2.AmazonLinuxImage().getImage(this).imageId,
+        imageId: new ec2.AmazonLinuxImage({
+          generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2, // Specify Amazon Linux 2
+        }).getImage(this).imageId,
         userData: cdk.Fn.base64(`
           #!/bin/bash
           sudo yum update -y
