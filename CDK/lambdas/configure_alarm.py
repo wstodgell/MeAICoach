@@ -2,6 +2,7 @@ import boto3
 
 def lambda_handler(event, context):
     cloudwatch = boto3.client('cloudwatch')
+    lambda_client = boto3.client('lambda')
     instance_id = event['instance_id']  # Retrieve instance_id from the previous step
     
 
@@ -11,6 +12,19 @@ def lambda_handler(event, context):
 
      # Define the CloudWatch Alarm name (can be dynamic if needed)
     alarm_name = f'LowCpuAlarm-{instance_id}'  # Example: make alarm name unique by appending instance ID
+
+    # Grant CloudWatch permission to invoke the Lambda function
+    try:
+        lambda_client.add_permission(
+            FunctionName=stop_lambda_arn,
+            StatementId=f"CloudWatchInvokePermission-{instance_id}",  # Unique statement ID
+            Action="lambda:InvokeFunction",
+            Principal="cloudwatch.amazonaws.com",  # Principal that will invoke the function
+            SourceArn=f"arn:aws:cloudwatch:{context.invoked_function_arn.split(':')[3]}:{context.invoked_function_arn.split(':')[4]}:alarm:{alarm_name}"  # Specify the exact CloudWatch alarm ARN
+        )
+    except lambda_client.exceptions.ResourceConflictException:
+        # Permission already exists, nothing to do here
+        pass
 
     # Create CloudWatch Alarm
     cloudwatch.put_metric_alarm(
