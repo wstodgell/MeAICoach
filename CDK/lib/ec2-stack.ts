@@ -145,6 +145,20 @@ export class EC2Stack extends cdk.Stack {
     attachVolumeLambda.addToRolePolicy(ec2Permissions);
     configureAlarmLambda.addToRolePolicy(ec2Permissions);
     
+    // Create Secrets Manager permissions for the launchEc2Lambda
+    const secretsManagerPermissions = new iam.PolicyStatement({
+      actions: [
+        'secretsmanager:CreateSecret',
+        'secretsmanager:PutSecretValue',
+        'secretsmanager:GetSecretValue',
+        'secretsmanager:DescribeSecret'
+      ],
+      resources: ['*'], // You can restrict this to specific secrets if needed
+    });
+
+    // Attach the Secrets Manager permissions to launchEc2Lambda
+    launchEc2Lambda.addToRolePolicy(secretsManagerPermissions);
+
     const ssmPermissions = new iam.PolicyStatement({
       actions: [
         "ssm:GetParameter",
@@ -257,7 +271,6 @@ export class EC2Stack extends cdk.Stack {
       parameterName: '/ai-model/stop-lambda-arn',
       stringValue: stopInstanceLambda.functionArn,  // Store the ARN of the StopInstanceLambda
     });
-
 
     const key = new ec2.CfnKeyPair(this, 'MyKeyPair', {
       keyName: 'my-key-pair',
