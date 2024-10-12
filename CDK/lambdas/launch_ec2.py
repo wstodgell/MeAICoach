@@ -1,6 +1,7 @@
 import boto3
 import os
 import json
+import time
 
 def get_parameter(name):
     ssm = boto3.client('ssm')
@@ -36,6 +37,13 @@ def lambda_handler(event, context):
                 print(f"Key pair {key_pair_name} already exists. Proceeding.")
             else:
                 raise e
+
+    # Log all key pairs available (for debugging)
+    existing_key_pairs = ec2.describe_key_pairs()
+    print(f"Available key pairs: {existing_key_pairs}")
+
+    # Add a delay to ensure key pair is fully registered
+    time.sleep(5)
 
     # Step 2: Fetch parameters from SSM
     launch_template_id = get_parameter('/ai-model/launch-template-id')
