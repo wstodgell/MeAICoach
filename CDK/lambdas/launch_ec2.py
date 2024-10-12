@@ -13,30 +13,35 @@ def lambda_handler(event, context):
     key_pair_name = 'my-key-pair'
     secret_name = f'EC2KeyPair-{key_pair_name}'
 
-    # Step 1: Check if the secret already exists
+    # Step 1: Check if the key pair already exists
     try:
-        response = secretsmanager.describe_secret(SecretId=secret_name)
-        print(f"Secret {secret_name} already exists. Skipping creation.")
-    except secretsmanager.exceptions.ResourceNotFoundException:
-        # Secret doesn't exist, create it
-        try:
+        ec2.describe_key_pairs(KeyNames=[key_pair_name])
+        print(f"Key pair {key_pair_name} already exists. Proceeding with existing key pair.")
+    except ec2.exceptions.ClientError as e:
+        if 'InvalidKeyPair.NotFound' in str(e):
+            print(f"Key pair {key_pair_name} does not exist. Creating a new key pair.")
             key_pair = ec2.create_key_pair(KeyName=key_pair_name)
             private_key = key_pair['KeyMaterial']
+            
+            # Store private key in Secrets Manager
+            try:
+                response = secretsmanager.create_secret(
+                    Name=secret_name,
+                    SecretString=private_key
+                )
+                print(f"Secret stored successfully. ARN: {response['ARN']}")
+            except secretsmanager.exceptions.ResourceExistsException:
+                print(f"Secret {secret_name} already exists. Overwriting the secret.")
+                secretsmanager.put_secret_value(
+                    SecretId=secret_name,
+                    SecretString=private_key
+                )
+        else:
+            raise e
 
-            # Log key pair creation
-            print(f"Key pair {key_pair_name} created successfully.")
-
-            # Save the private key securely (Store in Secrets Manager)
-            response = secretsmanager.create_secret(
-                Name=secret_name,
-                SecretString=private_key
-            )
-            print(f"Secret stored successfully. ARN: {response['ARN']}")
-        except ec2.exceptions.ClientError as e:
-            if 'InvalidKeyPair.Duplicate' in str(e):
-                print(f"Key pair {key_pair_name} already exists. Proceeding.")
-            else:
-                raise e
+    # Step 2: Delay for key pair propagation
+    print("Waiting for key pair propagation...")
+    time.sleep(5)  # Add a delay to ensure the key pair is ready
 
     # Log all key pairs available (for debugging)
     existing_key_pairs = ec2.describe_key_pairs()
