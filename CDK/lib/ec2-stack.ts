@@ -6,6 +6,7 @@ import * as ssm from 'aws-cdk-lib/aws-ssm'; // Import for Parameter Store
 import * as tasks from 'aws-cdk-lib/aws-stepfunctions-tasks';
 import * as sfn from 'aws-cdk-lib/aws-stepfunctions';
 import { Construct } from 'constructs';
+import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';  // Import Secrets Manager
 
 export class EC2Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -278,13 +279,34 @@ export class EC2Stack extends cdk.Stack {
       stringValue: stopInstanceLambda.functionArn,  // Store the ARN of the StopInstanceLambda
     });
 
-    const key = new ec2.CfnKeyPair(this, 'MyKeyPair', {
+    // Add Secrets Manager and Key Pair creation in the CDK Stack
+    const keyPair = new ec2.CfnKeyPair(this, 'MyKeyPair', {
       keyName: 'my-key-pair',
     });
-    
+
     new cdk.CfnOutput(this, 'KeyPairName', {
-      value: key.keyName,
+      value: keyPair.keyName,
       description: 'Key Pair for SSH access',
+    });
+
+    // Store the private key in Secrets Manager directly from CDK
+    const secret = new secretsmanager.Secret(this, 'KeyPairSecret', {
+      secretName: `EC2KeyPair-${keyPair.keyName}`,
+      description: 'Private key for EC2 SSH access',
+      generateSecretString: {
+        secretStringTemplate: JSON.stringify({}),
+        generateStringKey: 'privateKey',
+      },
+    });
+
+    secret.addRotationSchedule('RotationSchedule', {
+      automaticallyAfter: cdk.Duration.days(30), // Optional key rotation
+    });
+
+    // Ensure the private key output is stored in Secrets Manager
+    new ssm.StringParameter(this, 'KeyPairSSMParameter', {
+      parameterName: '/ai-model/private-key',
+      stringValue: secret.secretValue.toString(), // Store the private key in SSM for use later
     });
   }
 }
