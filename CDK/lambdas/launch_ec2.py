@@ -1,22 +1,46 @@
 import boto3
 import os
 import json
-import time
-
-def get_parameter(name):
-    ssm = boto3.client('ssm')
-    return ssm.get_parameter(Name=name)['Parameter']['Value']
 
 def lambda_handler(event, context):
     ec2 = boto3.client('ec2')
+    secretsmanager = boto3.client('secretsmanager')
 
-    # Step 2: Fetch parameters from SSM
+    key_pair_name = 'my-key-pair'
+    secret_name = f'EC2KeyPair-{key_pair_name}'
+
+    # Step 1: Check if the key pair already exists
+    try:
+        ec2.describe_key_pairs(KeyNames=[key_pair_name])
+        print(f"Key pair {key_pair_name} already exists. Proceeding with existing key pair.")
+    except ec2.exceptions.ClientError as e:
+        if 'InvalidKeyPair.NotFound' in str(e):
+            print(f"Key pair {key_pair_name} does not exist. Creating a new key pair.")
+            key_pair = ec2.create_key_pair(KeyName=key_pair_name)
+            private_key = key_pair['KeyMaterial']
+
+            # Store private key in Secrets Manager
+            try:
+                response = secretsmanager.create_secret(
+                    Name=secret_name,
+                    SecretString=private_key
+                )
+                print(f"Secret stored successfully. ARN: {response['ARN']}")
+            except secretsmanager.exceptions.ResourceExistsException:
+                print(f"Secret {secret_name} already exists. Overwriting the secret.")
+                secretsmanager.put_secret_value(
+                    SecretId=secret_name,
+                    SecretString=private_key
+                )
+        else:
+            raise e
+
+    # Step 3: Fetch parameters from SSM (assuming they're still needed)
     launch_template_id = get_parameter('/ai-model/launch-template-id')
     subnet_id = get_parameter('/ai-model/public-subnet-id')
     security_group_id = get_parameter('/ai-model/security-group-id')
-    key_pair_name = 'my-key-pair'  # Use the name of the key pair created by the CDK stack
 
-    # Step 3: Run EC2 instance with the key pair
+    # Step 4: Run EC2 instance with the key pair
     response = ec2.run_instances(
         LaunchTemplate={'LaunchTemplateId': launch_template_id},
         KeyName=key_pair_name,  # Attach the key pair for SSH access
@@ -35,3 +59,6 @@ def lambda_handler(event, context):
     print(json.dumps(result))  # Log the result
     return result
 
+def get_parameter(name):
+    ssm = boto3.client('ssm')
+    return ssm.get_parameter(Name=name)['Parameter']['Value']
