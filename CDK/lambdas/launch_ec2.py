@@ -11,7 +11,8 @@ def lambda_handler(event, context):
     secretsmanager = boto3.client('secretsmanager')
     key_pair_name = 'my-key-pair'
     secret_name = f'EC2KeyPair-{key_pair_name}'
-    
+
+    # Step 1: Check if the secret already exists
     try:
         response = secretsmanager.describe_secret(SecretId=secret_name)
         print(f"Secret {secret_name} already exists. Skipping creation.")
@@ -21,6 +22,10 @@ def lambda_handler(event, context):
             key_pair = ec2.create_key_pair(KeyName=key_pair_name)
             private_key = key_pair['KeyMaterial']
 
+            # Log key pair creation
+            print(f"Key pair {key_pair_name} created successfully.")
+
+            # Save the private key securely (Store in Secrets Manager)
             response = secretsmanager.create_secret(
                 Name=secret_name,
                 SecretString=private_key
