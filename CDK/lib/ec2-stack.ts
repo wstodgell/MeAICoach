@@ -179,7 +179,8 @@ export class EC2Stack extends cdk.Stack {
     const cloudwatchPermissions = new iam.PolicyStatement({
       actions: [
         'cloudwatch:PutMetricAlarm',  // Allow creating CloudWatch alarms
-        'lambda:InvokeFunction' // so cloudwatch actions can access invoke lambda
+        'lambda:InvokeFunction', // so cloudwatch actions can access invoke lambda
+        "lambda:AddPermission"
       ],
       resources: ['*'],  // Optionally, restrict to a specific resource or use '*' for all resources
     });
