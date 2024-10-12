@@ -20,7 +20,7 @@ def lambda_handler(event, context):
         # Save the private key securely (Store in Secrets Manager)
         private_key = key_pair['KeyMaterial']
         secretsmanager = boto3.client('secretsmanager')
-        secretsmanager.create_secret(
+        response = secretsmanager.create_secret(
             Name=f'EC2KeyPair-{key_pair_name}',
             SecretString=private_key
         )
