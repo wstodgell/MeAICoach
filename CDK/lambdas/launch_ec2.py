@@ -8,30 +8,29 @@ def get_parameter(name):
 
 def lambda_handler(event, context):
     ec2 = boto3.client('ec2')
-
-    # Step 1: Create a key pair (check if it exists first)
+    secretsmanager = boto3.client('secretsmanager')
     key_pair_name = 'my-key-pair'
+    secret_name = f'EC2KeyPair-{key_pair_name}'
     
     try:
-        # Try creating the key pair
-        key_pair = ec2.create_key_pair(KeyName=key_pair_name)
-        print(f"Storing private key for {key_pair_name} in Secrets Manager...")
+        response = secretsmanager.describe_secret(SecretId=secret_name)
+        print(f"Secret {secret_name} already exists. Skipping creation.")
+    except secretsmanager.exceptions.ResourceNotFoundException:
+        # Secret doesn't exist, create it
+        try:
+            key_pair = ec2.create_key_pair(KeyName=key_pair_name)
+            private_key = key_pair['KeyMaterial']
 
-        # Save the private key securely (Store in Secrets Manager)
-        private_key = key_pair['KeyMaterial']
-        secretsmanager = boto3.client('secretsmanager')
-        response = secretsmanager.create_secret(
-            Name=f'EC2KeyPair-{key_pair_name}',
-            SecretString=private_key
-        )
-
-         # Print success message with details
-        print(f"Secret stored successfully. ARN: {response['ARN']}")
-    except ec2.exceptions.ClientError as e:
-        if 'InvalidKeyPair.Duplicate' in str(e):
-            print(f"Key pair {key_pair_name} already exists. Proceeding.")
-        else:
-            raise e
+            response = secretsmanager.create_secret(
+                Name=secret_name,
+                SecretString=private_key
+            )
+            print(f"Secret stored successfully. ARN: {response['ARN']}")
+        except ec2.exceptions.ClientError as e:
+            if 'InvalidKeyPair.Duplicate' in str(e):
+                print(f"Key pair {key_pair_name} already exists. Proceeding.")
+            else:
+                raise e
 
     # Step 2: Fetch parameters from SSM
     launch_template_id = get_parameter('/ai-model/launch-template-id')
