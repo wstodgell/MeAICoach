@@ -160,6 +160,7 @@ export class EC2Stack extends cdk.Stack {
 
     // Attach the Secrets Manager permissions to launchEc2Lambda
     launchEc2Lambda.addToRolePolicy(secretsManagerPermissions);
+    stopInstanceLambda.addToRolePolicy(secretsManagerPermissions);
 
     const ssmPermissions = new iam.PolicyStatement({
       actions: [

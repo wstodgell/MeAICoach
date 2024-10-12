@@ -17,11 +17,17 @@ def lambda_handler(event, context):
     response = ec2.terminate_instances(InstanceIds=[instance_id])
     print(f"Terminating instance {instance_id}: {response}")
 
-    # Delete the associated CloudWatch alarm
-    alarm_response = cloudwatch.delete_alarms(AlarmNames=[alarm_name])
-    print(f"Deleted CloudWatch alarm {alarm_name}: {alarm_response}")
+    # Fetch the key pair name from SSM (or you can use environment variables if you have it stored there)
+    key_pair_name = ssm.get_parameter(Name='/ai-model/key-pair-name')['Parameter']['Value']
+
+    # Delete the associated EC2 key pair
+    try:
+        key_pair_response = ec2.delete_key_pair(KeyName=key_pair_name)
+        print(f"Deleted key pair {key_pair_name}: {key_pair_response}")
+    except Exception as e:
+        print(f"Failed to delete key pair {key_pair_name}: {str(e)}")
 
     return {
         'statusCode': 200,
-        'body': f"Terminated EC2 instance {instance_id} and deleted CloudWatch alarm {alarm_name}"
+        'body': f"Terminated EC2 instance {instance_id}, deleted CloudWatch alarm {alarm_name}, and deleted key pair {key_pair_name}"
     }

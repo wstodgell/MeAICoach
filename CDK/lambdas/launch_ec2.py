@@ -15,6 +15,7 @@ def lambda_handler(event, context):
     try:
         # Try creating the key pair
         key_pair = ec2.create_key_pair(KeyName=key_pair_name)
+        print(f"Storing private key for {key_pair_name} in Secrets Manager...")
 
         # Save the private key securely (Store in Secrets Manager)
         private_key = key_pair['KeyMaterial']
@@ -24,6 +25,8 @@ def lambda_handler(event, context):
             SecretString=private_key
         )
 
+         # Print success message with details
+        print(f"Secret stored successfully. ARN: {response['ARN']}")
     except ec2.exceptions.ClientError as e:
         if 'InvalidKeyPair.Duplicate' in str(e):
             print(f"Key pair {key_pair_name} already exists. Proceeding.")
