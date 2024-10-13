@@ -49,7 +49,7 @@ export class EC2Stack extends cdk.Stack {
     // Create a Launch Template for Spot Instance
     const launchTemplate = new ec2.CfnLaunchTemplate(this, 'LaunchTemplate', {
       launchTemplateData: {
-        instanceType: 't3.large', //'g4dn.xlarge', (need large for setting up EBS)
+        instanceType: 't3.medium', //'g4dn.xlarge', (need large for setting up EBS)
         imageId: new ec2.AmazonLinuxImage({
           generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023, // Use Amazon Linux 2023
         }).getImage(this).imageId,
@@ -140,12 +140,16 @@ export class EC2Stack extends cdk.Stack {
     const ec2Permissions = new iam.PolicyStatement({
       actions: [
         'ec2:RunInstances', 
-        'ec2:AttachVolume', 
+        'ec2:AttachVolume',
+        "ec2:DescribeVolumes",
         'ec2:DescribeInstances',
+        "ec2:TerminateInstances",
         'ec2:DescribeInstanceStatus',  // Add this permission
         'iam:CreateServiceLinkedRole',
         'ec2:CreateKeyPair',
-        'ec2:DescribeKeyPairs'
+        'ec2:DescribeKeyPairs',
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups"
       ],
       resources: ['*'],
     });
