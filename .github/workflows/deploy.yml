@@ -79,5 +79,4 @@ jobs:
       - name: Deploy EC2 Stack
         run: |
           cd CDK
-          npx cdk deploy EC2Stack --require-approval never
-          --parameters availabilityZone=${{ secrets.AWS_REGION }}a
+          npx cdk deploy EC2Stack --require-approval never --parameters availabilityZone=${{ secrets.AWS_REGION }}a
