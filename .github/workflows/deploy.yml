@@ -26,14 +26,14 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1 # You can replace this with your desired region
+          aws-region: ${{ secrets.AWS_REGION }} # Use region from GitHub secrets
 
       # Print the AWS account ID to verify connection
       - name: Verify AWS Connection (Print AWS Account ID)
         run: |
           aws sts get-caller-identity
         env:
-          AWS_DEFAULT_REGION: us-east-1 # Replace with your region if different
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} # Use region from GitHub secrets
           ACCOUNT_ID: ${{ secrets.ACCOUNT_ID }}
 
       - name: Get GitHub OIDC Token

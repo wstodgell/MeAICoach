@@ -50,11 +50,11 @@ export class EC2Stack extends cdk.Stack {
         }).getImage(this).imageId,
         userData: cdk.Fn.base64(`
           #!/bin/bash
-          sudo yum update -y
-          sudo yum install -y git
+          sudo dnf update -y  # Use dnf instead of yum for Amazon Linux 2023
+          sudo dnf install -y git
 
           # Install Python 3 and pip
-          sudo yum install -y python3
+          sudo dnf install -y python3
           sudo python3 -m ensurepip --upgrade
 
           # Install PyTorch with GPU support (CUDA 11.8)

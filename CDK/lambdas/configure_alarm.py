@@ -34,7 +34,7 @@ def lambda_handler(event, context):
         Statistic='Average',
         Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
         Period=300,
-        EvaluationPeriods=6,
+        EvaluationPeriods=2,
         Threshold=5,
         ComparisonOperator='LessThanThreshold',
         AlarmActions=[stop_lambda_arn] 
