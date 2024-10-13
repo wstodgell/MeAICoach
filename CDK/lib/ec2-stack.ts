@@ -12,8 +12,13 @@ export class EC2Stack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
-    // Create a VPC to host the EC2 instance - it spreads across two availability zones.
+    // Accept availability zone as a parameter
+    const availabilityZoneParam = new cdk.CfnParameter(this, 'availabilityZone', {
+      type: 'String',
+      description: 'The availability zone for the EC2 instance and EBS volume.',
+    });
 
+    // Create a VPC to host the EC2 instance - it spreads across two availability zones.
     const vpc = new ec2.Vpc(this, 'AIModelVPC', {
       maxAzs: 2
     });
@@ -33,7 +38,7 @@ export class EC2Stack extends cdk.Stack {
 
     // Step 3: Create a separate EBS volume
     const volume = new ec2.CfnVolume(this, 'LlamaEBSVolume', {
-      availabilityZone: 'us-east-1a',  // Ensure it's in the same AZ as the instance
+      availabilityZone: availabilityZoneParam.valueAsString, // Ensure it's in the same AZ as the instance
       size: 100,  // Size in GB
       volumeType: 'gp3',  // General-purpose SSD
     });
