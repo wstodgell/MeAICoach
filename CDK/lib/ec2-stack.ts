@@ -49,7 +49,7 @@ export class EC2Stack extends cdk.Stack {
     // Create a Launch Template for Spot Instance
     const launchTemplate = new ec2.CfnLaunchTemplate(this, 'LaunchTemplate', {
       launchTemplateData: {
-        instanceType: 't2.medium', //'g4dn.xlarge', (t2.medium is largest you can launch in sandbox)
+        instanceType: 'g6.xlarge',// (t2.medium is largest you can launch in sandbox)
         imageId: new ec2.AmazonLinuxImage({
           generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023, // Use Amazon Linux 2023
         }).getImage(this).imageId,
@@ -85,7 +85,7 @@ echo "User data script completed"
         instanceMarketOptions: {
           marketType: 'spot',
           spotOptions: {
-            maxPrice: '2.10', // Specify your max spot price
+            maxPrice: '1.10', // Specify your max spot price
           },
         },
         // Remove tags by ensuring no tagSpecifications are passed
