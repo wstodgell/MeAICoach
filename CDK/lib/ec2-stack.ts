@@ -49,24 +49,38 @@ export class EC2Stack extends cdk.Stack {
     // Create a Launch Template for Spot Instance
     const launchTemplate = new ec2.CfnLaunchTemplate(this, 'LaunchTemplate', {
       launchTemplateData: {
-        instanceType: 't3.medium', //'g4dn.xlarge', (need large for setting up EBS)
+        instanceType: 't2.medium', //'g4dn.xlarge', (t2.medium is largest you can launch in sandbox)
         imageId: new ec2.AmazonLinuxImage({
           generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023, // Use Amazon Linux 2023
         }).getImage(this).imageId,
+        blockDeviceMappings: [
+          {
+            deviceName: '/dev/xvda', // Default device for root volume on EC2
+            ebs: {
+              volumeSize: 20, // Set size to 20GB
+              volumeType: 'gp3', // General-purpose SSD (gp3 or gp2)
+              deleteOnTermination: true, // Automatically delete the volume when instance is terminated
+            },
+          },
+        ],
         userData: cdk.Fn.base64(`
-          #!/bin/bash
-          sudo dnf update -y  # Use dnf instead of yum for Amazon Linux 2023
-          sudo dnf install -y git
+#!/bin/bash
+exec > /var/log/user-data.log 2>&1  # Log user data output for debugging
 
-          # Install Python 3 and pip
-          sudo dnf install -y python3
-          sudo python3 -m ensurepip --upgrade
+echo "Starting EC2 user data script"
 
-          # Install PyTorch with GPU support (CUDA 11.8)
-          pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# Update the system
+sudo dnf update -y || exit 1
 
-          # Install Huggingface Transformers for LLaMA
-          pip3 install transformers accelerate sentencepiece
+# Install git
+sudo dnf install -y git || exit 1
+
+# Install Python 3 and pip
+sudo dnf install -y python3 || exit 1
+sudo python3 -m ensurepip --upgrade || exit 1
+
+# End of user data script
+echo "User data script completed"
         `),
         instanceMarketOptions: {
           marketType: 'spot',
